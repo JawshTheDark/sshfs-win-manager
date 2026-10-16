@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
+import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, nativeImage, safeStorage, shell } from 'electron'
 
 import appIcon from '../../resources/app-icon.png?asset'
 import errorIcon from '../../resources/error-icon.png?asset'
@@ -57,7 +57,14 @@ function start () {
     }
   }
 
-  const store = new Store(join(app.getPath('userData'), 'vuex.json'), log)
+  // Saved passwords are encrypted with the Windows account of whoever is logged in
+  const cipher = {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: text => safeStorage.encryptString(text).toString('base64'),
+    decrypt: encrypted => safeStorage.decryptString(Buffer.from(encrypted, 'base64'))
+  }
+
+  const store = new Store(join(app.getPath('userData'), 'vuex.json'), log, cipher)
 
   const processHandler = new ProcessHandlerWin({ getSettings: () => store.getSettings(), log })
   const processManager = new ProcessManager(processHandler)
@@ -236,6 +243,9 @@ function start () {
   })
 
   app.whenReady().then(() => {
+    // The encryption of the passwords only works once the app is ready
+    store.load()
+
     windows.openMain({ show: !process.argv.includes('--systray') })
 
     tray = new Tray(nativeImage.createFromPath(trayIcon))
@@ -263,4 +273,7 @@ function start () {
 
   // The tray keeps the app alive when every window is hidden
   app.on('window-all-closed', () => {})
+
+  // Don't lose a change that is still waiting to be saved
+  app.on('before-quit', () => store.flush())
 }

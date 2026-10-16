@@ -29,7 +29,7 @@ npm test
 
 ## How it is put together
 
-- `src/main`: the main process. It owns the state (`store.js`, saved as `vuex.json` in the app data folder),
+- `src/main`: the main process. It owns the state (`store.js`, saved as `vuex.json` in the app data folder, with the passwords encrypted),
   runs `sshfs.exe` (`sshfs/`), keeps the trusted host keys (`sshfs/hostKeys.js`) and opens the windows.
 - `src/preload`: the small API the windows are given to talk to the main process.
 - `src/renderer`: the windows themselves (Vue 3). They only show the state and ask the main process to change it.

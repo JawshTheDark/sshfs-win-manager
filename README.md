@@ -32,7 +32,7 @@ Requires Windows 10 or 11 (64-bit).
 ## Features
 
 - **Several ways to log in**
-  - Password<sup>1</sup>
+  - Password (stored encrypted, see [Security](#security))
   - Ask for the password when connecting
   - Private key (file)
   - **SSH key without a password**: uses the default keys in your `.ssh` folder (or an SSH agent), so there is nothing to type or store
@@ -72,15 +72,21 @@ A trusted key can be forgotten from the connection's *Advanced* tab, where verif
 Key based logins never ask for a password or passphrase and fail straight away if the key isn't accepted, rather than waiting for input nobody can give.
 Keys protected by a passphrase are not supported.
 
-<sup>1</sup> The *Password* login stores your password in a plain JSON file (`%APPDATA%\sshfs-win-manager\vuex.json`).
-If that is a concern, use a key or *Ask for password* instead.
+Saved passwords (the *Password* login) are **encrypted** before they are written to `%APPDATA%\sshfs-win-manager\vuex.json`, using Windows' own
+data protection (DPAPI, through Electron's `safeStorage`). That keeps them out of the file itself, so they don't leak through a backup, a synced folder or someone
+copying the file, and the encrypted form only opens for your Windows account on your PC. It does not protect against other programs running as you.
+For nothing stored at all, use a key or *Ask for password*.
+
+- Passwords saved by the original app are encrypted the first time this version starts, and the stale `vuex.json.<number>` copies the original left in that folder are deleted, as they hold the passwords in the clear.
+- Because of that the original app can't read the file any more (it would see empty passwords). Going back means entering them again.
+- If you move the file to another PC or Windows account the passwords can't be decrypted there, and have to be entered again.
 
 ## What's different from the original
 
 - **Fixed: connections hanging on "connecting".** Looking up a free drive letter relied on `wmic`, which current Windows 11 builds no longer ship, so
   connections set to *Auto* never finished. Every connection attempt now ends: it connects, fails with the reason, or times out and is cleaned up.
 - **Fixed:** simultaneous connections picking the same drive letter or marking each other as failed, false "disconnected" notices, and connection names with a comma breaking the mount.
-- **New:** host key verification and the passwordless login described above.
+- **New:** host key verification, the passwordless login described above, and saved passwords that are encrypted instead of written to disk in the clear.
 - **Modernised:** Electron 44, Vue 3, Vite and electron-builder replace the Electron 3 / Vue 2 / webpack 4 stack, which no longer built on current Node. The windows run sandboxed behind a small API instead of with full Node access.
 
 ## Building

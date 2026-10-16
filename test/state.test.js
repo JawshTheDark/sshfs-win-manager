@@ -9,6 +9,14 @@ import Store from '../src/main/store.js'
 
 const conn = (uuid, over = {}) => normalizeConnection({ uuid, name: uuid, host: 'h', port: 22, user: 'u', ...over })
 
+function open (file, log, cipher = null) {
+  const store = new Store(file, log, cipher)
+
+  store.load()
+
+  return store
+}
+
 function tempFile () {
   return join(mkdtempSync(join(tmpdir(), 'state test-')), 'vuex.json')
 }
@@ -73,7 +81,7 @@ test('the file of the old versions is read, and nothing is running at startup', 
     }
   }))
 
-  const store = new Store(file, () => {})
+  const store = open(file, () => {})
 
   assert.equal(store.state.Data.connections.length, 1)
   assert.equal(store.state.Data.connections[0].status, 'disconnected')
@@ -85,7 +93,7 @@ test('the file of the old versions is read, and nothing is running at startup', 
 
 test('saving writes the same file format, without what is only running right now', () => {
   const file = tempFile()
-  const store = new Store(file, () => {})
+  const store = open(file, () => {})
 
   store.commit('ADD_CONNECTION', conn('a'))
   store.commit('SET_CONNECTION_RUNTIME', { uuid: 'a', status: 'connected', pid: 7 })
@@ -100,7 +108,7 @@ test('saving writes the same file format, without what is only running right now
 })
 
 test('windows are told about every mutation, in order', () => {
-  const store = new Store(tempFile(), () => {})
+  const store = open(tempFile(), () => {})
   const seen = []
 
   store.on('mutation', message => seen.push(message))
@@ -117,7 +125,7 @@ test('an unreadable file is kept aside rather than lost', () => {
   writeFileSync(file, '{ this is not json')
 
   const messages = []
-  const store = new Store(file, message => messages.push(message))
+  const store = open(file, message => messages.push(message))
 
   assert.equal(store.state.Data.connections.length, 0)
   assert.match(messages[0], /keeping a copy/)
