@@ -24,7 +24,9 @@ if (process.env.SSHFS_WIN_MANAGER_DATA) {
 
 const isSecondInstance = !app.requestSingleInstanceLock()
 
-app.setAppUserModelId('SSHFS-Win Manager')
+// Windows ties the taskbar button and the notifications to the shortcut of the installer,
+// which carries the app id of the build configuration
+app.setAppUserModelId(app.isPackaged ? 'dev.babum.apps.sshfs-win-manager' : 'SSHFS-Win Manager')
 
 if (isSecondInstance) {
   app.quit()
