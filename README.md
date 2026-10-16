@@ -1,79 +1,111 @@
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/evsar3/sshfs-win-manager?sort=semver">
-  <img src="https://img.shields.io/github/downloads/evsar3/sshfs-win-manager/total">
-  <img src="https://img.shields.io/github/issues-raw/evsar3/sshfs-win-manager/bug?color=red">
-  <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=HXZUJ8WX47238" style="margin-left: 50px; vertical-align: middle;">
-    <img src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" alt="Donate" title="PayPal - The safer, easier way to pay online!">
-  </a>
+  <img src="https://img.shields.io/github/v/release/JawshTheDark/sshfs-win-manager?sort=semver">
+  <img src="https://img.shields.io/github/downloads/JawshTheDark/sshfs-win-manager/total">
+  <img src="https://img.shields.io/github/license/JawshTheDark/sshfs-win-manager">
 </p>
 
 # SSHFS-Win Manager
 
-## Introduction 
-SSHFS-Win Manager is a GUI (graphics user interface) for SSHFS on Windows (comming soon for other platforms).
+A friendly Windows app for mounting remote folders as drives over SSH, built on [SSHFS-Win](https://github.com/billziss-gh/sshfs-win).
+Add your servers once, then connect and disconnect with a click from the window or the system tray.
+
+![Main window](docs/screenshots/main-window.png)
+
+> This is a fork of [evsar3/sshfs-win-manager](https://github.com/evsar3/sshfs-win-manager). It fixes the connections that hung on
+> "connecting", checks the identity of the servers you connect to, supports passwordless key logins, and moves the
+> app to current versions of everything. Your saved connections from the original carry over. See [What's different](#whats-different-from-the-original).
 
 ## Installation
-**Step 1**  
 
-Install SSHFS-Win on your Windows computer.  
-Follow their [installation instructions](https://github.com/billziss-gh/sshfs-win/blob/master/README.md) before continuing.  
+**Step 1** &ndash; Install [SSHFS-Win](https://github.com/billziss-gh/sshfs-win) (follow its
+[installation instructions](https://github.com/billziss-gh/sshfs-win/blob/master/README.md); it brings WinFsp along).
 
-**Step 2**  
+**Step 2** &ndash; [Download the latest sshfs-win-manager](https://github.com/JawshTheDark/sshfs-win-manager/releases/latest) and run the installer.
 
-Once SSHFS-Win is installed, [**download the lastest sshfs-win-manager**](https://github.com/evsar3/sshfs-win-manager/releases/latest) from the [releases](https://github.com/evsar3/sshfs-win-manager/releases) section and install it.  
+- If you have the original SSHFS-Win Manager running, **quit it first** (system tray icon, right-click, *Quit*). The new one won't start while another copy is open.
+- The installer is **not code-signed**, so Windows SmartScreen may warn about it. Choose *More info*, then *Run anyway*. The release lists a SHA-256 checksum to compare against.
 
-**Step 3**  
+**Step 3** &ndash; Add your connections and enjoy!
 
-Add your connections and enjoy!
+Requires Windows 10 or 11 (64-bit).
 
 ## Features
 
-- Electron-based application. [Electron](https://github.com/electron/electron) is the same engine that powers [Visual Studio Code](https://github.com/microsoft/vscode), [Discord](https://discordapp.com/), [GitKraken](https://www.gitkraken.com/) and [many more](https://www.electronjs.org/apps).
-
-- User-friendly and intuitive interface
-
-- Multiple authentication methods: 
+- **Several ways to log in**
   - Password<sup>1</sup>
-  - Private Key (file)
-  - SSH key without a password (uses the default keys in your `.ssh` folder, or an SSH agent)
-  - Ask for password
+  - Ask for the password when connecting
+  - Private key (file)
+  - **SSH key without a password**: uses the default keys in your `.ssh` folder (or an SSH agent), so there is nothing to type or store
+- **Host key verification**: the first time you connect to a server you are shown its fingerprint to confirm, and from then on a server presenting a different key is refused. See [Security](#security)
+- **Connections that don't hang**: a connection that can't be made fails within seconds with the actual reason ("Connection refused", "Connection timed out", "Could not resolve hostname"...), and dead links are noticed instead of freezing Explorer
+- Connect on startup, and mount on a fixed drive letter or the first free one
+- Startup with Windows and close to the system tray
+- Reorder, duplicate and edit connections
+- Supports advanced sshfs/ssh command line options
+- Debug panel showing what sshfs is doing
 
-- Host key verification: the first time you connect to a server its fingerprint is shown for you to confirm, and from then on a server presenting a different key is refused (unless you explicitly accept the new one). Can be switched off per connection.
-- Connections that fail or stop answering time out instead of hanging
+![Add connection](docs/screenshots/add-connection.png)
 
-- Startup with Windows
-- Close to system tray
-- Quick debug tool
-- Supports advanced command line params
-- Easily duplicate connections
-- Reorder connections
-- Connection debug log
+## Security
 
-## Screenshots
-![Main Window](https://user-images.githubusercontent.com/1992754/179056109-a0df5872-f187-40b1-895c-9ef57abd5fe7.png)  
-*Main Window*
+### Host keys
 
-![Add Connection](https://user-images.githubusercontent.com/1992754/179056126-0f767346-fe93-48fc-9ceb-3514b0b7b386.png)  
-*Add & edit connections*
+SSH servers prove who they are with a host key. Without checking it, a fake server on the network can pose as yours and
+capture everything you send it, including your password.
 
-![Open mounted drive](https://user-images.githubusercontent.com/1992754/179056142-3d368a65-f9c6-4232-86d6-bb8db6eff556.png)  
-*Explore mounted drive*
+- The **first** connection to a server asks you to confirm its fingerprint. Compare it with the one the server reports
+  (on the server: `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
+- **Every later** connection is checked against the key you trusted.
+- If the server presents a **different** key, the connection is refused and you are shown both fingerprints. Accept the new key only if you know why it changed (a reinstalled server, for instance).
 
-![System tray](https://user-images.githubusercontent.com/1992754/179056152-9a7088c4-f23a-4c0d-b70b-1ccf879897fb.png)  
-*Close to system tray*
+| First connection | Key changed |
+| --- | --- |
+| ![Trusting a new server](docs/screenshots/host-key-new.png) | ![A changed host key](docs/screenshots/host-key-changed.png) |
+
+Trusted keys are kept in `%APPDATA%\sshfs-win-manager\known_hosts`, separate from your own `.ssh\known_hosts`, so each server asks once.
+A trusted key can be forgotten from the connection's *Advanced* tab, where verification can also be switched off for that connection (not recommended).
+
+![Advanced settings](docs/screenshots/advanced.png)
+
+### Keys and passwords
+
+Key based logins never ask for a password or passphrase and fail straight away if the key isn't accepted, rather than waiting for input nobody can give.
+Keys protected by a passphrase are not supported.
+
+<sup>1</sup> The *Password* login stores your password in a plain JSON file (`%APPDATA%\sshfs-win-manager\vuex.json`).
+If that is a concern, use a key or *Ask for password* instead.
+
+## What's different from the original
+
+- **Fixed: connections hanging on "connecting".** Looking up a free drive letter relied on `wmic`, which current Windows 11 builds no longer ship, so
+  connections set to *Auto* never finished. Every connection attempt now ends: it connects, fails with the reason, or times out and is cleaned up.
+- **Fixed:** simultaneous connections picking the same drive letter or marking each other as failed, false "disconnected" notices, and connection names with a comma breaking the mount.
+- **New:** host key verification and the passwordless login described above.
+- **Modernised:** Electron 44, Vue 3, Vite and electron-builder replace the Electron 3 / Vue 2 / webpack 4 stack, which no longer built on current Node. The windows run sandboxed behind a small API instead of with full Node access.
+
+## Building
+
+You need [Node.js](https://nodejs.org/) 20.19 or newer.
+
+```bash
+npm install
+npm run dev        # run from source
+npm run build      # build the installer into release/
+npm test           # unit tests
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 
 ## Bugs & help
-If you have any question or a bug report please open a [new issue](https://github.com/evsar3/sshfs-win-manager/issues/new)
 
-## Contributing
-If you want to contribute with this project, please see the [contributing guide-lines](https://github.com/evsar3/sshfs-win-manager/blob/master/CONTRIBUTING.md)  
-If you just want to build or compile this project see instructions [here](https://github.com/evsar3/sshfs-win-manager/blob/master/CONTRIBUTING.md#building-and-compiling)
+If you have a question or a bug report, please open a [new issue](https://github.com/JawshTheDark/sshfs-win-manager/issues/new).
+To include sshfs's log, turn on *Show debug panel* in the settings and copy its content.
 
-## Donation
-If you like this project, please consider [making a donation](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=HXZUJ8WX47238). 100% of the founds will be revert for <u>charity</u>.
+## Credits & donations
 
-## Notes
-<sup>1</sup> This software stores your password in a plain json file. If there is any concerns on storing your password that way, please use one of the other authentication methods. See issue #28
+SSHFS-Win Manager was created by [Evandro Araujo](https://github.com/evsar3), whose [original project](https://github.com/evsar3/sshfs-win-manager) this builds on.
+His donation link supports [ACAMP](donation-concluded.md), a charity for homeless children in Fortaleza, Brazil:
+[donate via the original project](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=HXZUJ8WX47238).
 
 ## License
 MIT License
