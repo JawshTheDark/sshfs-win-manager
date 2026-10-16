@@ -1,16 +1,17 @@
 <template>
-  <label class="switch-label">{{label}} <toggle-button :color="toggleButtonColor" v-model="_value" sync labels></toggle-button></label>
+  <label class="switch-label">{{label}}
+    <button type="button" role="switch" class="toggle" :class="{ checked: modelValue }" :aria-checked="modelValue" @click.prevent="$emit('update:modelValue', !modelValue)">
+      <span class="state">{{modelValue ? 'on' : 'off'}}</span>
+      <span class="knob"></span>
+    </button>
+  </label>
 </template>
 
 <script>
-import { ToggleButton } from 'vue-js-toggle-button'
-
 export default {
   name: 'SwitchLabel',
 
-  components: {
-    ToggleButton
-  },
+  emits: ['update:modelValue'],
 
   props: {
     label: {
@@ -18,51 +19,70 @@ export default {
       required: true,
       default: ''
     },
-    value: {
+    modelValue: {
       type: Boolean,
       required: false,
       default: false
-    }
-  },
-
-  methods: {
-    emitChanges () {
-      this.$emit('input', this._value)
-    }
-  },
-
-  computed: {
-    _value: {
-      get () {
-        return this.value
-      },
-
-      set (value) {
-        console.log(value)
-        this.$emit('input', value)
-      }
-    }
-  },
-
-  data () {
-    return {
-      toggleButtonColor: {
-        checked: '#2486d8',
-        unchecked: 'rgba(255, 255, 255, 0.1)'
-      }
     }
   }
 }
 </script>
 
 <style lang="less" scoped>
+@toggle-width: 50px;
+@toggle-height: 22px;
+@knob-margin: 3px;
+
 .switch-label {
+  display: block;
   margin-top: 5px;
-  
-  .vue-js-switch {
+
+  .toggle {
+    position: relative;
     float: right;
     clear: both;
     margin-top: -4px;
+    width: @toggle-width;
+    height: @toggle-height;
+    border: none;
+    border-radius: @toggle-height;
+    background: rgba(255, 255, 255, 0.1);
+    color: contrast(@main-color);
+    font-size: 8pt;
+    outline: none;
+    cursor: pointer;
+    transition: background-color 200ms;
+
+    .state {
+      position: absolute;
+      top: 0;
+      right: 9px;
+      line-height: @toggle-height;
+    }
+
+    .knob {
+      position: absolute;
+      top: @knob-margin;
+      left: @knob-margin;
+      width: @toggle-height - 2 * @knob-margin;
+      height: @toggle-height - 2 * @knob-margin;
+      border-radius: 100%;
+      background: #fff;
+      transition: transform 200ms;
+    }
+
+    &.checked {
+      background: @primary-color;
+
+      .state {
+        right: auto;
+        left: 9px;
+      }
+
+      .knob {
+        transform: translateX(@toggle-width - @toggle-height);
+      }
+    }
   }
 }
 </style>

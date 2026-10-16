@@ -13,12 +13,10 @@
 </template>
 
 <script>
-import { remote } from 'electron'
-
-const window = remote.getCurrentWindow()
-
 export default {
-  name: 'Header',
+  name: 'WindowHeader',
+
+  emits: ['close'],
 
   props: {
     title: {
@@ -36,13 +34,13 @@ export default {
 
   methods: {
     close () {
-      if (this.closeAction === 'hide') {
-        window.hide()
-      } else {
-        window.close()
-      }
-
       this.$emit('close')
+
+      if (this.closeAction === 'hide') {
+        window.api.window.hide()
+      } else {
+        window.api.window.close()
+      }
     }
   }
 }

@@ -29,7 +29,7 @@
               <option value="password">Password</option>
               <option value="password-ask">Password (ask on connect)</option>
               <option value="key-file">Private Key (file)</option>
-              <!-- <option value="key-input" disabled>Private Key (input)</option> -->
+              <option value="key-default">SSH key, no password (default keys)</option>
             </select>
           </div>
           <div v-show="conn.authType === 'password'" class="form-item">
@@ -39,17 +39,20 @@
           <div v-show="conn.authType === 'key-file'" class="form-row">
             <div class="form-item">
               <label>Key File</label>
-              <input type="text" placeholder="eg. C:\Users\me\.ssh\id_rsa" v-model="conn.keyFile">
+              <input type="text" placeholder="eg. C:\Users\me\.ssh\id_ed25519" v-model="conn.keyFile">
             </div>
             <div class="form-item" style="flex: 0">
-              <button class="btn icon-btn" style="margin-top: 23px" @click="selectPrivateKey" v-tooltip="'Select private key'">
+              <button class="btn icon-btn" style="margin-top: 23px" v-tooltip="'Select private key'" @click="selectPrivateKey">
                 <Icon icon="openFolder"/>
               </button>
             </div>
           </div>
-          <div v-show="conn.authType === 'key-input'" class="form-item">
-            <label>Key</label>
-            <textarea placeholder="eg. ssh-rsa AAAAB3Nz..." v-model="conn.key"></textarea>
+          <div v-show="conn.authType === 'key-default'" class="form-item">
+            <p class="auth-hint">
+              Logs in without a password, using the keys in your <code>.ssh</code> folder
+              (<code>id_ed25519</code>, <code>id_rsa</code>, ...) or an SSH agent. The matching public
+              key has to be authorized on the server. Keys protected by a passphrase are not supported.
+            </p>
           </div>
 
           <h1 class="section-title">Remote</h1>
@@ -74,6 +77,22 @@
           </div>
 
           <div class="form-item">
+            <SwitchLabel label="Verify the Server's Host Key (recommended)" v-model="conn.advanced.verifyHostKey"/>
+
+            <p v-if="conn.advanced.verifyHostKey && trustedKeys.length > 0" class="host-key">
+              Trusted key: {{trustedKeys[0].name}}<br>
+              <span class="fingerprint">{{trustedKeys[0].fingerprint}}</span>
+              <button class="btn forget" @click="forgetHostKey">Forget</button>
+            </p>
+            <p v-else-if="conn.advanced.verifyHostKey" class="host-key">
+              The server's key will be shown for you to confirm the first time you connect.
+            </p>
+            <p v-else class="host-key warning">
+              Without this, a fake server can pose as yours and capture what you send it.
+            </p>
+          </div>
+
+          <div class="form-item">
             <SwitchLabel label="Custom Command Line params" v-model="conn.advanced.customCmdlOptionsEnabled"/>
 
             <CustomCmdlOptions v-model="conn.advanced.customCmdlOptions"/>
@@ -90,17 +109,35 @@
 </template>
 
 <script>
-import { remote } from 'electron'
-import { v4 as uuid } from 'uuid'
+import Window from '@/components/Window/index.vue'
+import Tabs from '@/components/Tabs/Tabs.vue'
+import Tab from '@/components/Tabs/Tab.vue'
+import SwitchLabel from '@/components/SwitchLabel.vue'
+import CustomCmdlOptions from './CustomCmdlOptions.vue'
+import Icon from '../Icon.vue'
 
-import Window from '@/components/Window'
-import Tabs from '@/components/Tabs/Tabs'
-import Tab from '@/components/Tabs/Tab'
-import SwitchLabel from '@/components/SwitchLabel'
-import CustomCmdlOptions from './CustomCmdlOptions'
-import Icon from '../Icon'
-
-const windowManager = remote.require('electron-window-manager')
+function emptyConnection (home) {
+  return {
+    uuid: crypto.randomUUID(),
+    name: '',
+    host: '',
+    port: 22,
+    user: '',
+    folder: '/',
+    authType: 'password',
+    password: '',
+    keyFile: home + '\\.ssh\\id_ed25519',
+    key: '',
+    mountPoint: 'auto',
+    advanced: {
+      customCmdlOptionsEnabled: false,
+      customCmdlOptions: [],
+      connectOnStartup: false,
+      reconnect: false,
+      verifyHostKey: true
+    }
+  }
+}
 
 export default {
   name: 'add-edit-connection-window',
@@ -116,37 +153,43 @@ export default {
 
   methods: {
     cancel () {
-      windowManager.closeCurrent()
+      window.api.window.close()
     },
 
-    save () {
+    async save () {
       this.conn.advanced.customCmdlOptions =
         this.conn.advanced.customCmdlOptions.filter(a => a.name !== '')
 
       if (this.isEditingMode) {
-        this.$store.dispatch('UPDATE_CONNECTION', this.conn)
+        await this.$store.dispatch('UPDATE_CONNECTION', this.conn)
       } else {
-        this.$store.dispatch('ADD_CONNECTION', this.conn)
+        await this.$store.dispatch('ADD_CONNECTION', this.conn)
       }
 
-      windowManager.closeCurrent()
+      window.api.window.close()
     },
 
     authTypeChange () {
       this.conn.password = ''
-      this.conn.keyFile = process.env.USERPROFILE + '\\.ssh\\id_rsa'
+      this.conn.keyFile = this.home + '\\.ssh\\id_ed25519'
     },
 
-    selectPrivateKey () {
-      const file = remote.dialog.showOpenDialog({
-        title: 'Select private key',
-        properties: ['openFile'],
-        defaultPath: process.env.USERPROFILE + '\\.ssh\\'
-      })
+    async selectPrivateKey () {
+      const file = await window.api.dialog.selectPrivateKey()
 
-      if (file && file.length > 0) {
-        this.conn.keyFile = file[0]
+      if (file) {
+        this.conn.keyFile = file
       }
+    },
+
+    async loadTrustedKeys () {
+      this.trustedKeys = this.conn.host ? await window.api.hostKeys.get(this.conn.host, this.conn.port) : []
+    },
+
+    async forgetHostKey () {
+      await window.api.hostKeys.forget(this.conn.host, this.conn.port)
+
+      await this.loadTrustedKeys()
     }
   },
 
@@ -157,37 +200,35 @@ export default {
       title: 'Add Connection',
       drives: 'DEFGHIJKLMNOPQRSTUVWXYZ',
 
-      conn: {
-        uuid: uuid(),
-        name: '',
-        host: '',
-        port: 22,
-        user: '',
-        folder: '/',
-        authType: 'password',
-        password: '',
-        keyFile: process.env.USERPROFILE + '\\.ssh\\id_rsa',
-        key: '',
-        mountPoint: 'auto',
-        status: 'disconnected',
-        pid: 0,
-        advanced: {
-          customCmdlOptionsEnabled: false,
-          customCmdlOptions: [],
-          connectOnStartup: false,
-          reconnect: false
-        }
-      }
+      home: '',
+      trustedKeys: [],
+
+      conn: emptyConnection('')
     }
   },
 
-  mounted () {
+  async mounted () {
+    this.home = (await window.api.app.info()).home
+
     if (this.$route.name === 'edit-connection') {
+      const saved = this.$store.state.Data.connections.find(a => a.uuid === this.$route.params.uuid)
+
+      if (!saved) {
+        window.api.window.close()
+
+        return
+      }
+
       this.isEditingMode = true
 
       this.title = 'Edit Connection'
 
-      this.conn = this.$store.state.Data.connections.find(a => a.uuid === this.$route.params.uuid)
+      // Edited as a copy, so cancelling leaves the connection as it was
+      this.conn = JSON.parse(JSON.stringify(saved))
+
+      await this.loadTrustedKeys()
+    } else {
+      this.conn = emptyConnection(this.home)
     }
   }
 }
@@ -209,6 +250,37 @@ export default {
     right: 0;
     padding: 15px;
     text-align: right;
+  }
+
+  .auth-hint,
+  .host-key {
+    font-size: 10pt;
+    line-height: 1.5;
+    color: fade(contrast(@main-color), 50%);
+    margin-top: 6px;
+
+    code {
+      font-family: 'Consolas', 'Courier New', Courier, monospace;
+    }
+
+    .fingerprint {
+      font-family: 'Consolas', 'Courier New', Courier, monospace;
+      font-size: 9pt;
+      word-break: break-all;
+      user-select: text;
+    }
+
+    .forget {
+      display: block;
+      min-width: 0;
+      padding: 2px 12px;
+      line-height: 18px;
+      margin: 5px 0 0;
+    }
+
+    &.warning {
+      color: @danger-color;
+    }
   }
 }
 </style>

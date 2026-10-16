@@ -1,5 +1,5 @@
 <template>
-  <div class="tab" v-show="isActive">
+  <div v-show="tabs.isActive(label)" class="tab">
       <slot></slot>
   </div>
 </template>
@@ -7,6 +7,8 @@
 <script>
 export default {
   name: 'Tab',
+
+  inject: ['tabs'],
 
   props: {
     active: {
@@ -20,10 +22,12 @@ export default {
     }
   },
 
-  data () {
-    return {
-      isActive: this.active
-    }
+  mounted () {
+    this.tabs.register(this.label, this.active)
+  },
+
+  beforeUnmount () {
+    this.tabs.unregister(this.label)
   }
 }
 </script>

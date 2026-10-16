@@ -26,13 +26,8 @@
 </template>
 
 <script>
-import { remote } from 'electron'
-
-import Window from '@/components/Window'
-import SwitchLabel from '@/components/SwitchLabel'
-
-const windowManager = remote.require('electron-window-manager')
-const app = remote.require('electron').app
+import Window from '@/components/Window/index.vue'
+import SwitchLabel from '@/components/SwitchLabel.vue'
 
 export default {
   name: 'settings-window',
@@ -44,43 +39,31 @@ export default {
 
   methods: {
     cancel () {
-      windowManager.closeCurrent()
+      window.api.window.close()
     },
 
-    save () {
-      this.$store.dispatch('UPDATE_SETTINGS', this.data)
+    async save () {
+      await this.$store.dispatch('UPDATE_SETTINGS', this.data)
+      await window.api.app.setOpenAtLogin(this.data.startupWithOS)
 
-      app.setLoginItemSettings({
-        ...{
-          openAtLogin: this.data.startupWithOS
-        },
-        ...this.loginItemSettings
-      })
-
-      windowManager.closeCurrent()
-    }
-  },
-
-  computed: {
-    data () {
-      return this.$store.state.Settings.settings
+      window.api.window.close()
     }
   },
 
   data () {
     return {
-      loginItemSettings: {
-        args: [
-          '--systray'
-        ]
-      }
+      // Edited here, and only applied on OK
+      data: { ...this.$store.state.Settings.settings }
     }
   },
 
-  mounted () {
-    const settings = app.getLoginItemSettings(this.loginItemSettings)
+  async mounted () {
+    const info = await window.api.app.info()
 
-    this.data.startupWithOS = settings.openAtLogin
+    // What Windows has is what counts (only once installed, a development run never registers itself)
+    if (info.isPackaged) {
+      this.data.startupWithOS = info.openAtLogin
+    }
   }
 }
 </script>

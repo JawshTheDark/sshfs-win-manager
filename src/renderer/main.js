@@ -1,21 +1,16 @@
-import Vue from 'vue'
+import { createApp } from 'vue'
+import FloatingVue from 'floating-vue'
+import 'floating-vue/dist/style.css'
 
-import App from './App'
+import App from './App.vue'
 import router from './router'
-import store from './store'
+import storePlugin, { setupStore } from './store.js'
 
-import vToolTip from 'v-tooltip'
+// Every window starts from the current state
+await setupStore()
 
-if (!process.env.IS_WEB) Vue.use(require('vue-electron'))
-
-Vue.config.productionTip = false
-
-Vue.use(vToolTip)
-
-/* eslint-disable no-new */
-new Vue({
-  components: { App },
-  router,
-  store,
-  template: '<App/>'
-}).$mount('#app')
+createApp(App)
+  .use(router)
+  .use(storePlugin)
+  .use(FloatingVue)
+  .mount('#app')

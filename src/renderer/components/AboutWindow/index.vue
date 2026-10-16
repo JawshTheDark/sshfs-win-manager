@@ -19,12 +19,13 @@
           Author: Evandro Araujo (<a href="https://github.com/evsar3">@evsar3</a>)
         </p>
         <p>This program is licensed under <a href="https://opensource.org/licenses/MIT">MIT license</a></p>
-        <p>This program contains parts of following open-source projects:
+        <p>
+This program contains parts of following open-source projects:
           <ul>
             <li>Node.js (<a href="https://github.com/nodejs/node">https://github.com/nodejs/node</a>)</li>
             <li>Electron (<a href="https://github.com/electron/electron">https://github.com/electron/electron</a>)</li>
-            <li>Vue.js (<a href="https://github.com/vuejs/vue">https://github.com/vuejs/vue</a>)</li>
-            <li>Electron-Vue (<a href="https://github.com/SimulatedGREG/electron-vue">https://github.com/SimulatedGREG/electron-vue</a>)</li>
+            <li>Vue.js (<a href="https://github.com/vuejs/core">https://github.com/vuejs/core</a>)</li>
+            <li>Vite (<a href="https://github.com/vitejs/vite">https://github.com/vitejs/vite</a>)</li>
             <li>SSHFS-Win (<a href="https://github.com/billziss-gh/sshfs-win">https://github.com/billziss-gh/sshfs-win</a>)</li>
           </ul>
         </p>
@@ -35,11 +36,7 @@
 </template>
 
 <script>
-import { shell, remote } from 'electron'
-
-import Window from '@/components/Window'
-
-const app = remote.app
+import Window from '@/components/Window/index.vue'
 
 export default {
   name: 'about-window',
@@ -50,16 +47,18 @@ export default {
 
   data () {
     return {
-      appVersion: app.getVersion()
+      appVersion: ''
     }
   },
 
-  mounted () {
+  async mounted () {
+    this.appVersion = (await window.api.app.info()).version
+
     this.$el.querySelectorAll('a').forEach(item => {
       item.addEventListener('click', event => {
         event.preventDefault()
 
-        shell.openExternal(item.href)
+        window.api.app.openExternal(item.href)
       })
     })
   }

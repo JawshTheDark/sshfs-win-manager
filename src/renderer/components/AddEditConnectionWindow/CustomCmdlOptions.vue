@@ -1,14 +1,14 @@
 <template>
   <div class="custom-cmdl-list">
-    <div v-for="param in value" :key="param.uuid" class="list-item">
+    <div v-for="(param, index) in modelValue" :key="param.uuid || index" class="list-item">
       <div class="row param">
         <div class="name">
-          <select v-model="param.name" @input="emmitChanges" @change="paramNameChange(param)">
+          <select v-model="param.name" @change="paramNameChange(param)">
             <option v-for="option in options" :key="option.name" :value="option.name" :selected="param.name === option.name">{{option.name}}</option>
           </select>
         </div>
         <div class="value" v-show="getOption(param.name).type !== 'bool'">
-          <input type="text" placeholder="Param value" v-model="param.value" :disabled="getOption(param.name).type === 'bool'" @input="emmitChanges">
+          <input type="text" placeholder="Param value" v-model="param.value" :disabled="getOption(param.name).type === 'bool'">
         </div>
         <div class="remove">
           <button @click="removeParam(param)">
@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <h1 v-if="value.length === 0" class="no-data">No params added yet</h1>
+    <h1 v-if="modelValue.length === 0" class="no-data">No params added yet</h1>
 
     <button @click="addParam" class="btn add-param" :disabled="hasEmptyParam">
       <Icon icon="plus"/> Add param
@@ -31,11 +31,9 @@
 </template>
 
 <script>
-import { v4 as uuid } from 'uuid'
+import Icon from '@/components/Icon.vue'
 
-import Icon from '@/components/Icon'
-
-import SshfsParamsList from '@/SshfsParamsList'
+import SshfsParamsList from '@/SshfsParamsList.js'
 
 export default {
   name: 'CustomCmdlOptions',
@@ -44,31 +42,32 @@ export default {
     Icon
   },
 
+  emits: ['update:modelValue'],
+
   props: {
-    value: {
+    modelValue: {
       type: Array,
       required: false,
-      default: []
+      default: () => []
     }
   },
 
   methods: {
     addParam () {
       if (!this.hasEmptyParam) {
-        this.value.push({
-          uuid: uuid(),
-          name: '',
-          value: ''
-        })
+        this.$emit('update:modelValue', [
+          ...this.modelValue,
+          {
+            uuid: crypto.randomUUID(),
+            name: '',
+            value: ''
+          }
+        ])
       }
-
-      this.emmitChanges()
     },
 
     removeParam (param) {
-      this.value.splice(this.value.findIndex(a => a.uuid === param.uuid), 1)
-
-      this.emmitChanges()
+      this.$emit('update:modelValue', this.modelValue.filter(a => a !== param))
     },
 
     getOption (name) {
@@ -85,10 +84,6 @@ export default {
       return option
     },
 
-    emmitChanges () {
-      this.$emit('input', this.value)
-    },
-
     paramNameChange (param) {
       param.value = ''
     }
@@ -96,13 +91,13 @@ export default {
 
   computed: {
     hasEmptyParam () {
-      return this.value.find(a => a.name === '')
+      return this.modelValue.find(a => a.name === '')
     }
   },
 
   data () {
     return {
-      options: SshfsParamsList.sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
+      options: [...SshfsParamsList].sort((a, b) => a.name > b.name ? 1 : (a.name < b.name ? -1 : 0))
     }
   }
 }

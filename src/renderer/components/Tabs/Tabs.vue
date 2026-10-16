@@ -1,7 +1,7 @@
 <template>
   <div class="tabs-container">
     <div class="tabs-selector">
-      <button v-for="tab in tabs" :key="tab.label" class="tab-selector" :class="{'tab-selector--selected': tab.isActive}" @click="select(tab)">
+      <button v-for="tab in tabs" :key="tab.label" class="tab-selector" :class="{'tab-selector--selected': tab.label === activeLabel}" @click="activeLabel = tab.label">
         {{tab.label}}
       </button>
     </div>
@@ -14,26 +14,31 @@
 export default {
   name: 'Tabs',
 
-  methods: {
-    select (tab) {
-      this.tabs.forEach(tab => {
-        tab.isActive = false
-      })
+  provide () {
+    return {
+      tabs: {
+        register: (label, active) => {
+          this.tabs.push({ label })
 
-      tab.isActive = true
+          if (active || this.activeLabel === null) {
+            this.activeLabel = label
+          }
+        },
+
+        unregister: label => {
+          this.tabs = this.tabs.filter(tab => tab.label !== label)
+        },
+
+        isActive: label => this.activeLabel === label
+      }
     }
   },
 
   data () {
     return {
-      tabs: []
+      tabs: [],
+      activeLabel: null
     }
-  },
-
-  mounted () {
-    this.$children.forEach(tab => {
-      this.tabs.push(tab)
-    })
   }
 }
 </script>

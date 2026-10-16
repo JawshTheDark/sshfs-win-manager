@@ -1,7 +1,7 @@
 <template>
   <div class="window">
     <div class="header-container">
-      <Header :title="title" :closeAction="closeAction" @close="$emit('close')"/>
+      <WindowHeader :title="title" :closeAction="closeAction" @close="$emit('close')"/>
     </div>
     <div class="content-container">
       <slot></slot>
@@ -10,14 +10,16 @@
 </template>
 
 <script>
-import Header from './Header'
+import WindowHeader from './Header.vue'
 
 export default {
   name: 'Window',
 
   components: {
-    Header
+    WindowHeader
   },
+
+  emits: ['close'],
 
   props: {
     title: {

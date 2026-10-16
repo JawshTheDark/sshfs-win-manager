@@ -1,9 +1,9 @@
 <template>
-  <Window :title="`Password for ${conn.user}@${conn.host}`" @close="cancel">
+  <Window :title="`Password for ${request.user}@${request.host}`">
     <div class="wrap">
       <div class="form-item">
         <label>Password</label>
-        <input type="password" autofocus v-model="password" @keydown.enter="ok" @keydown.esc="cancel">
+        <input type="password" ref="password" v-model="password" @keydown.enter="ok" @keydown.esc="cancel">
       </div>
 
       <div class="footer">
@@ -15,11 +15,7 @@
 </template>
 
 <script>
-import { remote } from 'electron'
-
-import Window from '@/components/Window'
-
-const windowManager = remote.require('electron-window-manager')
+import Window from '@/components/Window/index.vue'
 
 export default {
   name: 'password-prompt-window',
@@ -29,36 +25,30 @@ export default {
   },
 
   methods: {
-    cancel () {
-      windowManager.bridge.emit('main-window-message', {
-        message: 'connection-password-cancel',
-        conn: this.conn
-      })
+    async cancel () {
+      await window.api.prompt.answer(this.$route.params.id, null)
 
-      windowManager.closeCurrent()
+      window.api.window.close()
     },
 
-    ok () {
-      this.conn.password = this.password
+    async ok () {
+      await window.api.prompt.answer(this.$route.params.id, this.password)
 
-      windowManager.bridge.emit('main-window-message', {
-        message: 'connection-password',
-        conn: this.conn
-      })
-
-      windowManager.closeCurrent()
+      window.api.window.close()
     }
   },
 
   data () {
     return {
       password: '',
-      conn: null
+      request: { user: '', host: '' }
     }
   },
 
-  mounted () {
-    this.conn = this.$store.state.Data.connections.find(a => a.uuid === this.$route.params.uuid)
+  async mounted () {
+    this.$refs.password.focus()
+
+    this.request = (await window.api.prompt.get(this.$route.params.id)) || this.request
   }
 }
 </script>

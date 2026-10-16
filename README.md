@@ -34,8 +34,12 @@ Add your connections and enjoy!
 
 - Multiple authentication methods: 
   - Password<sup>1</sup>
-  - Private Key (without password)
+  - Private Key (file)
+  - SSH key without a password (uses the default keys in your `.ssh` folder, or an SSH agent)
   - Ask for password
+
+- Host key verification: the first time you connect to a server its fingerprint is shown for you to confirm, and from then on a server presenting a different key is refused (unless you explicitly accept the new one). Can be switched off per connection.
+- Connections that fail or stop answering time out instead of hanging
 
 - Startup with Windows
 - Close to system tray

@@ -1,10 +1,7 @@
-.DS_Store
-dist/electron/*
-dist/web/*
-build/*
-!build/icons
 node_modules/
-npm-debug.log
-npm-debug.log.*
+out/
+release/
+.DS_Store
 thumbs.db
-!.gitkeep
+npm-debug.log*
+!build/icons

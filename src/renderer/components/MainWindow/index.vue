@@ -1,5 +1,5 @@
 <template>
-  <Window title="SSHFS-Win Manager" closeAction="hide" @close="showRunningInBackgroundNotification">
+  <Window title="SSHFS-Win Manager" closeAction="hide">
     <div class="wrap">
       <div class="left">
         <div class="connection-list" :class="{'has-debug-panel': appSettings.showDebugPanel}">
@@ -8,9 +8,9 @@
             <p>Try clicking at 'Add Server' in the panel aside</p>
           </div>
 
-          <draggable :list="connections" @end="updateConnectionList" chosenClass="highlight-item" dragClass="hide-dragging-item" handle=".grip" animation="200">
+          <VueDraggable v-model="sortedConnections" handle=".grip" chosen-class="highlight-item" drag-class="hide-dragging-item" :animation="200">
             <ConnectionItem v-for="conn in connections" :key="conn.uuid" :conn="conn" :mode="listMode" @connect="connect" @disconnect="disconnect" @open="openLocal" @edit="editConnection" @delete="deleteConnection" @clone="cloneConnection"/>
-          </draggable>
+          </VueDraggable>
         </div>
 
         <div v-show="appSettings.showDebugPanel" class="debug-panel">
@@ -45,9 +45,9 @@
         </button>
 
         <div class="bottom-actions">
-          <button v-if="isDev" class="btn" @click="clearVuex">
+          <button v-if="isDev" class="btn" @click="clearState">
             <Icon icon="unavailable"/>
-            Clear Vuex State
+            Clear saved state
           </button>
           <button class="btn" @click="settings">
             <Icon icon="settings"/>
@@ -64,26 +64,21 @@
 </template>
 
 <script>
-import fs from 'fs'
-import { remote, clipboard } from 'electron'
+import { VueDraggable } from 'vue-draggable-plus'
 
-import { v4 as uuid } from 'uuid'
+import { mutations } from '../../../shared/state.js'
 
-import draggable from 'vuedraggable'
+import Window from '@/components/Window/index.vue'
+import Icon from '@/components/Icon.vue'
+import ConnectionItem from './ConnectionItem.vue'
 
-import ProcessManager from '@/ProcessManager'
-
-import Window from '@/components/Window'
-import Icon from '@/components/Icon'
-import ConnectionItem from './ConnectionItem'
-
-const windowManager = remote.require('electron-window-manager')
+const DEBUG_OUTPUT_LIMIT = 100000
 
 export default {
   name: 'main-window',
 
   components: {
-    draggable,
+    VueDraggable,
 
     Window,
     Icon,
@@ -101,188 +96,55 @@ export default {
     },
 
     connect (conn) {
-      conn.status = 'connecting'
-
-      const connect = c => {
-        ProcessManager.create(c).then(pid => {
-          conn.pid = pid
-          conn.status = 'connected'
-
-          this.updateConnectionList()
-        }).catch(error => {
-          conn.status = 'disconnected'
-
-          this.updateConnectionList()
-
-          this.notify(`Can't connect to '${conn.name}': ${error}`, 'error-icon')
-        })
-      }
-
-      if (conn.authType === 'password-ask') {
-        const window = windowManager.createNew('password-prompt-window', '', `/index.html#password-prompt/${conn.uuid}`, null, {
-          height: 190,
-          width: 350,
-          useContentSize: true,
-          frame: false,
-          maximizable: false,
-          minimizable: false,
-          resizable: false,
-          modal: true,
-          parent: windowManager.get('main-window').object
-        }).create()
-
-        window.object.once('ready-to-show', () => {
-          window.object.show()
-        })
-
-        windowManager.bridge.once('main-window-message', data => {
-          switch (data.message) {
-            case 'connection-password':
-              connect(data.conn)
-              break
-
-            case 'connection-password-cancel':
-              conn.status = 'disconnected'
-              break
-          }
-        })
-      } else {
-        connect(conn)
-      }
+      window.api.connection.connect(conn.uuid)
     },
 
     disconnect (conn) {
-      conn.status = 'disconnecting'
-
-      ProcessManager.terminate(conn.pid).then(() => {
-        conn.status = 'disconnected'
-
-        this.updateConnectionList()
-      })
+      window.api.connection.disconnect(conn.uuid)
     },
 
-    openLocal (path) {
-      remote.shell.openItem(path)
+    openLocal (conn) {
+      window.api.connection.openFolder(conn.uuid)
     },
 
     addNewConnection () {
-      const window = windowManager.createNew('add-new-connection-window', '', '/index.html#add-new-connection', null, {
-        height: 770,
-        width: 500,
-        useContentSize: true,
-        frame: false,
-        maximizable: false,
-        minimizable: false,
-        resizable: false,
-        modal: true,
-        parent: windowManager.get('main-window').object
-      }).create()
-
-      window.object.once('ready-to-show', () => {
-        window.object.show()
-      })
+      window.api.window.open('add-connection')
     },
 
     editConnection (conn) {
-      const window = windowManager.createNew('edit-connection-window', '', `/index.html#edit-connection/${conn.uuid}`, null, {
-        height: 770,
-        width: 500,
-        useContentSize: true,
-        frame: false,
-        maximizable: false,
-        minimizable: false,
-        resizable: false,
-        modal: true,
-        parent: windowManager.get('main-window').object
-      }).create()
-
-      window.object.once('ready-to-show', () => {
-        window.object.show()
-      })
+      window.api.window.open('edit-connection', conn.uuid)
     },
 
     cloneConnection (conn) {
-      const connCopy = {...conn}
+      const connCopy = JSON.parse(JSON.stringify(conn))
 
       const randName = Math.random().toString(30).substr(-4)
 
-      connCopy.uuid = uuid()
+      connCopy.uuid = crypto.randomUUID()
       connCopy.name += ` (copy-${randName})`
 
       this.$store.dispatch('ADD_CONNECTION', connCopy)
     },
 
-    deleteConnection (conn) {
-      this.$store.dispatch('DELETE_CONNECTION', conn)
+    async deleteConnection (conn) {
+      await this.$store.dispatch('DELETE_CONNECTION', { uuid: conn.uuid })
 
-      setTimeout(() => {
-        if (this.connections.length === 0) {
-          this.listMode = 'none'
-        }
-      }, 200)
-    },
-
-    settings () {
-      const window = windowManager.createNew('settings-window', '', '/index.html#settings', null, {
-        height: 365,
-        width: 500,
-        useContentSize: true,
-        frame: false,
-        maximizable: false,
-        minimizable: false,
-        resizable: false,
-        modal: true,
-        parent: windowManager.get('main-window').object
-      }).create()
-
-      window.object.once('ready-to-show', () => {
-        window.object.show()
-      })
-    },
-
-    about () {
-      const window = windowManager.createNew('about-window', '', '/index.html#about', null, {
-        height: 350,
-        width: 550,
-        useContentSize: true,
-        frame: false,
-        maximizable: false,
-        minimizable: false,
-        resizable: false,
-        modal: true,
-        parent: windowManager.get('main-window').object
-      }).create()
-
-      window.object.once('ready-to-show', () => {
-        window.object.show()
-      })
-    },
-
-    showRunningInBackgroundNotification () {
-      if (!this.runningInBackgroundNotificationShowed) {
-        if (this.$store.state.Settings.settings.displayTrayMessageOnClose) {
-          this.notify('Program still running in the system tray')
-
-          this.runningInBackgroundNotificationShowed = true
-        }
+      if (this.connections.length === 0) {
+        this.listMode = 'none'
       }
     },
 
-    clearVuex () {
+    settings () {
+      window.api.window.open('settings')
+    },
+
+    about () {
+      window.api.window.open('about')
+    },
+
+    clearState () {
       this.$store.dispatch('CLEAR_CONNECTIONS')
       this.$store.dispatch('RESET_SETTINGS')
-    },
-
-    notify (text, icon = 'app-icon') {
-      /* eslint-disable-next-line */
-      new Notification('SSHFS-Win Manager', {
-        icon: __static + '/' + icon + '.png',
-        body: text
-      })
-    },
-
-    getConnectionByPid (pid) {
-      return this.connections.find(a => a.pid === pid)
     },
 
     clearDebugOutput () {
@@ -290,13 +152,29 @@ export default {
     },
 
     copyDebugOutput () {
-      clipboard.writeText(this.debugOutput)
-
-      this.notify('Debug output copied to clipboard')
+      window.api.app.copyText(this.debugOutput)
     },
 
-    updateConnectionList () {
-      this.$store.dispatch('REFRESH_CONNECTIONS', this.connections)
+    appendDebugOutput (line) {
+      // The per-request lines of sshfs's own log ("[00012] READ"), far too many to be of use here
+      if (!this.appSettings.showDebugPanel || /\[?\d{5}\]?/.test(line)) {
+        return
+      }
+
+      this.debugOutput += '\n' + line.trim()
+
+      // sshfs is very chatty in debug mode, and an ever-growing textarea freezes the window
+      if (this.debugOutput.length > DEBUG_OUTPUT_LIMIT * 1.5) {
+        this.debugOutput = this.debugOutput.slice(-DEBUG_OUTPUT_LIMIT)
+      }
+
+      this.$nextTick().then(() => {
+        const output = this.$refs.debugOutput
+
+        if (output) {
+          output.scrollTop = output.scrollHeight
+        }
+      })
     }
   },
 
@@ -314,11 +192,27 @@ export default {
     },
 
     isDev () {
-      return process.env.NODE_ENV === 'development'
+      return import.meta.env.DEV
     },
 
     connections () {
       return this.$store.state.Data.connections
+    },
+
+    // What the draggable list reads and writes: dropping an item saves the new order
+    sortedConnections: {
+      get () {
+        return this.connections
+      },
+
+      set (list) {
+        const uuids = list.map(conn => conn.uuid)
+
+        // Applied right away too, or the list would jump back until the main process answers
+        mutations.REORDER_CONNECTIONS(this.$store.state, uuids)
+
+        this.$store.dispatch('REORDER_CONNECTIONS', uuids)
+      }
     },
 
     appSettings () {
@@ -329,80 +223,12 @@ export default {
   data () {
     return {
       listMode: 'none',
-      runningInBackgroundNotificationShowed: false,
       debugOutput: ''
     }
   },
 
   mounted () {
-    const originalConsoleLog = console.log.bind(console)
-
-    console.log = (...args) => {
-      if (this.appSettings.showDebugPanel) {
-        const data = args.join(' ').trim()
-
-        if (!data.match(/\[?\d{5}\]?/gm)) {
-          this.debugOutput += '\n' + data
-
-          this.$nextTick().then(() => {
-            this.$refs.debugOutput.scrollTop = this.$refs.debugOutput.scrollHeight
-          })
-        }
-      }
-
-      originalConsoleLog(...args)
-    }
-
-    this.connections.forEach(conn => {
-      conn.status = 'disconnected'
-      conn.pid = null
-
-      if (conn.advanced.connectOnStartup) {
-        this.connect(conn)
-      }
-    })
-
-    ProcessManager.on('terminated', pid => {
-      let conn = this.getConnectionByPid(pid)
-
-      if (conn) {
-        conn.pid = null
-        conn.status = 'disconnected'
-      }
-    })
-
-    ProcessManager.on('not-found', pid => {
-      let conn = this.getConnectionByPid(pid)
-
-      if (conn) {
-        conn.pid = null
-        conn.status = 'disconnected'
-
-        this.notify(`'${conn.name}' was disconnected due to a connection error.\nCheck your internet connection`, 'error-icon')
-      }
-    })
-
-    ProcessManager.on('timeout', conn => {
-      if (fs.existsSync(conn.mountPoint)) {
-        ProcessManager.getLastSpawnedProcess().then(process => {
-          let foundConnection = this.connections.find(i => i.pid === process.pid)
-
-          if (!foundConnection) {
-            conn.pid = process.pid
-            conn.status = 'connected'
-
-            ProcessManager.watch(process.pid)
-
-            this.notify(`'${conn.name}' tracked using alternative method`)
-          }
-        })
-      } else {
-        conn.pid = null
-        conn.status = 'disconnected'
-
-        this.notify(`Process Timeout: Couldn't connect to '${conn.name}'`, 'error-icon')
-      }
-    })
+    window.api.onDebugLog(line => this.appendDebugOutput(line))
   }
 }
 </script>

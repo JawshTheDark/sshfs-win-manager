@@ -26,7 +26,7 @@
     </div>
 
     <div class="controls">
-      <button v-show="isConnected" @click="$emit('open', conn.mountPoint === 'auto' ? conn.preferredMountPoint : conn.mountPoint)">
+      <button v-show="isConnected" @click="$emit('open', conn)">
         <Icon icon="openFolder"/>
       </button>
 
@@ -56,7 +56,7 @@
 </template>
 
 <script>
-import Icon from '@/components/Icon'
+import Icon from '@/components/Icon.vue'
 
 export default {
   name: 'connection-item',
@@ -64,6 +64,8 @@ export default {
   components: {
     Icon
   },
+
+  emits: ['open', 'connect', 'disconnect', 'edit', 'delete', 'clone'],
 
   props: {
     conn: {
@@ -273,7 +275,7 @@ export default {
 .reveal-to-right-enter-active, .reveal-to-right-leave-active {
   transition: all .5s;
 }
-.reveal-to-right-enter, .reveal-to-right-leave-to {
+.reveal-to-right-enter-from, .reveal-to-right-leave-to {
   opacity: 0;
   flex: 0 !important;
 }
